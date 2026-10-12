@@ -1,6 +1,13 @@
 
 print_header "Configure Steam"
 
+# shellcheck source=/usr/bin/steam-headless-paths.sh
+source /usr/bin/steam-headless-paths.sh
+
+steam_library_dir="$(steam_headless_steam_library)"
+games_library_root="$(dirname "${steam_library_dir}")"
+steam_bin="$(steam_headless_steam_bin)"
+
 steam_autostart_desktop="$(
     cat <<EOF
 [Desktop Entry]
@@ -8,7 +15,7 @@ Encoding=UTF-8
 Type=Application
 Name=Steam
 Comment=Launch steam on login
-Exec=/usr/games/steam %U ${STEAM_ARGS:-}
+Exec=${steam_bin} %U ${STEAM_ARGS:-}
 Icon=steam
 OnlyShowIn=XFCE;
 RunHook=0
@@ -50,7 +57,7 @@ default_steam_library_config="$(
 {
         "0"
         {
-                "path"          "/home/default/.steam/steam"
+                "path"          "${USER_HOME:?}/.steam/steam"
                 "label"         "Home"
                 "totalsize"     "0"
                 "update_clean_bytes_tally" "0"
@@ -61,7 +68,7 @@ default_steam_library_config="$(
         }
         "1"
         {
-                "path"          "/mnt/games/GameLibrary/Steam"
+                "path"          "${steam_library_dir}"
                 "label"         "Games"
                 "contentid"     "4532270033051814356"
                 "totalsize"     "0"
@@ -86,6 +93,14 @@ EOF
 )"
 
 if [ "${ENABLE_STEAM:-}" = "true" ]; then
+    if [ -d "$(steam_headless_games_dir)" ]; then
+        print_step_header "Reconciling Steam library metadata paths"
+        steam_headless_repair_path "${games_library_root}" 0755
+        steam_headless_repair_path "${steam_library_dir}" 0755
+        steam_headless_repair_path "${steam_library_dir}/steamapps" 0755
+        steam_headless_repair_file_if_exists "${steam_library_dir}/libraryfolder.vdf" 0664
+        steam_headless_assert_writable_as_user "${steam_library_dir}"
+    fi
     if [ "${MODE}" == "s" ] || [ "${MODE}" == "secondary" ]; then
         print_step_header "Enable Steam supervisor.d service"
         sed -i 's|^autostart.*=.*$|autostart=true|' /etc/supervisor.d/steam.ini
@@ -116,12 +131,10 @@ if [ "${ENABLE_STEAM:-}" = "true" ]; then
         chown -R "${USER:?}:${USER:?}" "${USER_HOME:?}/.steam"
         # Only if we have mounted a /mnt/games path, then make the default games library for steam
         if [ -d "/mnt/games" ]; then
-            mkdir -p "/mnt/games/GameLibrary/Steam/steamapps"
-            chown "${USER:?}:${USER:?}" \
-                "/mnt/games/GameLibrary" \
-                "/mnt/games/GameLibrary/Steam" \
-                "/mnt/games/GameLibrary/Steam/steamapps"
-            echo "${games_steam_library_config}" >"/mnt/games/GameLibrary/Steam/libraryfolder.vdf"
+            steam_headless_repair_path "${games_library_root}" 0755
+            steam_headless_repair_path "${steam_library_dir}" 0755
+            steam_headless_repair_path "${steam_library_dir}/steamapps" 0755
+            runuser -u "${USER:?}" -- bash -c 'cat >"$1"' bash "${steam_library_dir}/libraryfolder.vdf" <<<"${games_steam_library_config}"
         fi
     else
         print_step_header "Steam library config already exists, skipping initialization"

@@ -29,7 +29,7 @@ for group_name in "${additional_groups[@]}"; do
         usermod -aG ${group_name:?} ${USER}
     fi
 done
-device_nodes=( /dev/uinput /dev/input/event* /dev/dri/* )
+device_nodes=( /dev/uinput /dev/uhid /dev/input/event* /dev/dri/* )
 added_groups=""
 for dev in "${device_nodes[@]}"; do
     # Only process $dev if it's a character device
@@ -70,7 +70,7 @@ umask ${UMASK}
 print_step_header "Create the user XDG_RUNTIME_DIR path '${XDG_RUNTIME_DIR}'"
 mkdir -p ${XDG_RUNTIME_DIR}
 # Ensure it is owned by the 'default' user
-chown -R ${PUID}:${PGID} ${XDG_RUNTIME_DIR}
+chown ${PUID}:${PGID} ${XDG_RUNTIME_DIR}
 # Ensure only the 'default' user can access this directory
 chmod 700 ${XDG_RUNTIME_DIR}
 # Set the default background
@@ -82,7 +82,7 @@ chmod a+r /etc/alternatives/desktop-background
 # Setup services log path
 print_step_header "Setting ownership of all log files in '${USER_HOME}/.cache/log'"
 mkdir -p "${USER_HOME}/.cache/log"
-chown -R ${PUID}:${PGID} "${USER_HOME}/.cache/log"
+chown ${PUID}:${PGID} "${USER_HOME}/.cache" "${USER_HOME}/.cache/log"
 
 
 # Set the root and user password

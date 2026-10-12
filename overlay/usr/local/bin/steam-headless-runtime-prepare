@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+log() {
+    echo "steam-headless-runtime-prepare: $*"
+}
+
+user_name="${STEAM_HEADLESS_USER:-steamheadless}"
+user_home="$(getent passwd "${user_name}" | cut -d: -f6)"
+target_uid="$(id -u "${user_name}")"
+target_gid="$(id -g "${user_name}")"
+
+machine_id="$(cat /var/lib/steam-headless/machine-id 2>/dev/null || true)"
+if [[ ! "${machine_id}" =~ ^[0-9a-f]{32}$ ]]; then
+    machine_id="$(cat /etc/machine-id 2>/dev/null || true)"
+fi
+if [[ ! "${machine_id}" =~ ^[0-9a-f]{32}$ ]]; then
+    machine_id="$(systemd-id128 new)"
+fi
+
+compositor_render_device="${COMPOSITOR_RENDER_DEVICE:-}"
+if [[ -z "${compositor_render_device}" ]]; then
+    for candidate in /dev/dri/renderD*; do
+        if [[ -c "${candidate}" ]]; then
+            compositor_render_device="${candidate}"
+            break
+        fi
+    done
+fi
+compositor_render_device="${compositor_render_device:-/dev/dri/renderD128}"
+encoder_render_device="${ENCODER_RENDER_DEVICE:-${compositor_render_device}}"
+xdg_seat="${XDG_SEAT:-steam-headless-${machine_id}}"
+
+install -d -m 0755 /run/steam-headless /run/udev /run/udev/data
+install -d -m 0700 /run/steam-headless-inputd /run/steam-headless-inputd/devices
+install -d -o "${target_uid}" -g "${target_gid}" -m 0700 "/run/user/${target_uid}"
+install -d -o root -g input -m 0750 /dev/input
+
+cat >/run/steam-headless/environment <<EOF
+TZ=${TZ:-Etc/UTC}
+DISPLAY_MODE=${DISPLAY_MODE:-wayland}
+WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
+INITIAL_DISPLAY_WIDTH=${INITIAL_DISPLAY_WIDTH:-1920}
+INITIAL_DISPLAY_HEIGHT=${INITIAL_DISPLAY_HEIGHT:-1080}
+INITIAL_DISPLAY_REFRESH=${INITIAL_DISPLAY_REFRESH:-120}
+COMPOSITOR_RENDER_DEVICE=${compositor_render_device}
+ENCODER_RENDER_DEVICE=${encoder_render_device}
+SHUI_MEDIA_BACKEND=${SHUI_MEDIA_BACKEND:-gstreamer-vaapi}
+SHUI_MEDIA_CONVERSION=${SHUI_MEDIA_CONVERSION:-system}
+SHUI_ENCODER=${SHUI_ENCODER:-auto}
+SHUI_VIDEO_BITRATE_KBPS=${SHUI_VIDEO_BITRATE_KBPS:-4000}
+SHUI_SHOW_DIAGNOSTICS=${SHUI_SHOW_DIAGNOSTICS-}
+SHUI_DESKTOP_AUTOMATION_ENABLED=${SHUI_DESKTOP_AUTOMATION_ENABLED:-false}
+SHUI_SESSION_IDLE_TIMEOUT_DAYS=${SHUI_SESSION_IDLE_TIMEOUT_DAYS:-7}
+SHUI_WEBRTC_INITIAL_BITRATE=${SHUI_WEBRTC_INITIAL_BITRATE:-3000000}
+SHUI_WEBRTC_MAX_BITRATE=${SHUI_WEBRTC_MAX_BITRATE:-50000000}
+SHUI_WEBRTC_BITRATE_POLICY=${SHUI_WEBRTC_BITRATE_POLICY:-adaptive}
+SHUI_STUN_URLS=${SHUI_STUN_URLS:-}
+SHUI_TURN_URLS=${SHUI_TURN_URLS:-}
+SHUI_TURN_CREDENTIAL_LIFETIME_MINUTES=${SHUI_TURN_CREDENTIAL_LIFETIME_MINUTES:-10}
+SHUI_TURN_CLOCK_SKEW_SECONDS=${SHUI_TURN_CLOCK_SKEW_SECONDS:-30}
+ENABLE_STEAM_SYSTEMD_SERVICE=${ENABLE_STEAM_SYSTEMD_SERVICE:-true}
+STEAM_HEADLESS_SESSION_MODE=${STEAM_HEADLESS_SESSION_MODE:-desktop}
+SUNSHINE_NAME=${SUNSHINE_NAME:-${HOSTNAME}}
+SUNSHINE_ENABLE_AUTO_CONFIG=${SUNSHINE_ENABLE_AUTO_CONFIG:-true}
+SUNSHINE_ENABLE_AUTO_DISPLAY_MODE=${SUNSHINE_ENABLE_AUTO_DISPLAY_MODE:-true}
+XDG_SEAT=${xdg_seat}
+XDG_RUNTIME_DIR=/run/user/${target_uid}
+XDG_DATA_DIRS=${user_home}/.local/share/flatpak/exports/share:/var/lib/flatpak/exports/share:/usr/local/share:/usr/share
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${target_uid}/bus
+XDG_SESSION_TYPE=wayland
+XDG_CURRENT_DESKTOP=KDE
+KDE_FULL_SESSION=true
+KDE_SESSION_VERSION=6
+GBM_BACKEND=${GBM_BACKEND:-nvidia-drm}
+GBM_BACKENDS_PATH=${GBM_BACKENDS_PATH:-/usr/lib/x86_64-linux-gnu/gbm:/usr/lib64/gbm}
+__GLX_VENDOR_LIBRARY_NAME=${__GLX_VENDOR_LIBRARY_NAME:-nvidia}
+EOF
+
+cat >/run/steam-headless/shui-environment <<EOF
+SHUI_ENCODER_DEVICE=${encoder_render_device}
+EOF
+chmod 0600 /run/steam-headless/environment /run/steam-headless/shui-environment
+
+if [[ -d /mnt/games ]]; then
+    games_library=/mnt/games/GameLibrary/Steam
+    install -d -o "${target_uid}" -g "${target_gid}" -m 0755 \
+        /mnt/games/GameLibrary "${games_library}" "${games_library}/steamapps"
+    if [[ -e "${games_library}/libraryfolder.vdf" && ! -L "${games_library}/libraryfolder.vdf" ]]; then
+        chown "${target_uid}:${target_gid}" "${games_library}/libraryfolder.vdf" 2>/dev/null || true
+        chmod u+rw,g+rw "${games_library}/libraryfolder.vdf" 2>/dev/null || true
+    fi
+    if ! runuser -u "${user_name}" -- test -w "${games_library}"; then
+        owner="$(stat -c '%u:%g' "${games_library}" 2>/dev/null || printf unknown)"
+        mode="$(stat -c '%A' "${games_library}" 2>/dev/null || printf unknown)"
+        echo "${games_library} is not writable by ${user_name} (${target_uid}:${target_gid}); owner=${owner} mode=${mode}" >&2
+        exit 1
+    fi
+fi
+
+log "Prepared volatile runtime and managed library metadata for ${user_name} as ${target_uid}:${target_gid}."

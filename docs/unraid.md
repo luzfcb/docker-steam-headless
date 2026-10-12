@@ -10,6 +10,17 @@ Follow these instructions to install Steam Headless on Unraid
 ![](./images/install-steam-headless-unraid-ca.png)
 4. Configure the template as required.
 
+### Permissions
+
+Unraid shares commonly use `nobody:users` (`99:100`). If your `/mnt/user/...` game or appdata shares use that ownership, set:
+
+```text
+PUID=99
+PGID=100
+```
+
+Do not leave the container at a different UID/GID unless you also migrate the mounted data to that same UID/GID. Steam Headless repairs only its managed metadata paths automatically; it does not recursively `chown` whole game libraries on every boot.
+
 
 ## GPU CONFIGURATION:
 
@@ -56,3 +67,5 @@ Unraid's Linux kernel by default does not have the modules required to support c
     - WEB_UI_MODE (Default: 'vnc' - Set to 'none' to disable the WebUI)
 
 3. No server restart is required, however. Ensure that the **steam-headless** Docker container is recreated after installing the **uinput** plugin for it to be able to detect the newly added module.
+
+If you pass input devices explicitly, use `/dev/uinput` and `/dev/uhid`. `/dev/uhdi` is a typo and will not exist on Unraid.

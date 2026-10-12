@@ -58,7 +58,7 @@ touch /tmp/.first-run-init-scripts
 
 # Execute any user generated init scripts
 mkdir -p ${USER_HOME:?}/init.d
-chown -R ${USER:?} ${USER_HOME:?}/init.d
+chown ${USER:?}:${USER:?} ${USER_HOME:?}/init.d
 for user_init_script in ${USER_HOME:?}/init.d/*.sh ; do
 
     # Check that a file was found 

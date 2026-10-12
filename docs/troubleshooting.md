@@ -14,7 +14,7 @@ Once your Flatpak refresh is complete, everything should work correctly and your
 ![img.png](./images/disk_write_error.png)
 
 1) Stop the container
-2) Verify your mounted /mnt/games volume is owned by the executing UID/GID, and 777 permissions are set.
+2) Verify the Steam Headless managed library path is owned by the executing UID/GID and is writable by that user.
 3) Verify the `steamapps` directory exists within the library location. 
 
 > __Note__
@@ -24,7 +24,7 @@ Once your Flatpak refresh is complete, everything should work correctly and your
 > Depending on how you have installed this, the directory path may vary.
 
 ```shell
-sudo mkdir /mnt/games/GameLibrary/SteamLibrary/steamapps
-sudo chmod -R 777 /mnt/games
-sudo chown -R $(id -u):$(id -g) /mnt/games
+sudo mkdir -p /mnt/games/GameLibrary/Steam/steamapps
+sudo chown -R $(id -u):$(id -g) /mnt/games/GameLibrary
+sudo chmod -R u+rwX,g+rwX /mnt/games/GameLibrary
 ```

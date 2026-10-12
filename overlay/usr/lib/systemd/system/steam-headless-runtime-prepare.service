@@ -1,0 +1,10 @@
+[Unit]
+Description=Steam Headless volatile runtime and managed path preparation
+DefaultDependencies=no
+After=local-fs.target systemd-tmpfiles-setup.service
+Before=steam-headless-shinputd.service steam-headless-pipewire.service steam-headless-pipewire-pulse.service steam-headless-wireplumber.service steam-headless-compositor.service steam-headless-shui.service steam-headless-sunshine.service steam-headless.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/steam-headless-runtime-prepare
+RemainAfterExit=yes
