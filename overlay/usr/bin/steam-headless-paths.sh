@@ -26,10 +26,18 @@ steam_headless_steam_library() {
 
     if [[ -n "${STEAM_LIBRARY_DIR:-}" ]]; then
         printf '%s\n' "${STEAM_LIBRARY_DIR}"
-    elif [[ -d "${games_dir}/GameLibrary/Steam/steamapps" ]]; then
+    elif compgen -G "${games_dir}/GameLibrary/SteamLibrary/steamapps/appmanifest_*.acf" >/dev/null; then
+        printf '%s\n' "${games_dir}/GameLibrary/SteamLibrary"
+    elif compgen -G "${games_dir}/SteamLibrary/steamapps/appmanifest_*.acf" >/dev/null; then
+        printf '%s\n' "${games_dir}/SteamLibrary"
+    elif compgen -G "${games_dir}/GameLibrary/Steam/steamapps/appmanifest_*.acf" >/dev/null; then
         printf '%s\n' "${games_dir}/GameLibrary/Steam"
+    elif [[ -d "${games_dir}/GameLibrary/SteamLibrary/steamapps" ]]; then
+        printf '%s\n' "${games_dir}/GameLibrary/SteamLibrary"
     elif [[ -d "${games_dir}/SteamLibrary/steamapps" ]]; then
         printf '%s\n' "${games_dir}/SteamLibrary"
+    elif [[ -d "${games_dir}/GameLibrary/Steam/steamapps" ]]; then
+        printf '%s\n' "${games_dir}/GameLibrary/Steam"
     else
         printf '%s\n' "${games_dir}/GameLibrary/Steam"
     fi
