@@ -31,9 +31,11 @@ compositor_render_device="${compositor_render_device:-/dev/dri/renderD128}"
 encoder_render_device="${ENCODER_RENDER_DEVICE:-${compositor_render_device}}"
 xdg_seat="${XDG_SEAT:-steam-headless-${machine_id}}"
 
-install -d -m 0755 /run/steam-headless /run/udev /run/udev/data
+install -d -o "${target_uid}" -g "${target_gid}" -m 0755 /run/steam-headless
+install -d -m 0755 /run/udev /run/udev/data
 install -d -m 0700 /run/steam-headless-inputd /run/steam-headless-inputd/devices
 install -d -o "${target_uid}" -g "${target_gid}" -m 0700 "/run/user/${target_uid}"
+install -d -o root -g root -m 0755 /run/steam-headless/session
 install -d -o root -g input -m 0750 /dev/input
 
 cat >/run/steam-headless/environment <<EOF
